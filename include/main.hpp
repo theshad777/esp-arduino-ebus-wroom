@@ -7,8 +7,13 @@
 
 #define MAX_WIFI_CLIENTS 4
 
+#ifndef UART_TX
 #define UART_TX 20
+#endif
+
+#ifndef UART_RX
 #define UART_RX 21
+#endif
 #if !defined(EBUS_INTERNAL)
 #define USE_SOFTWARE_SERIAL 0
 #define USE_ASYNCHRONOUS 0  // requires USE_SOFTWARE_SERIAL
