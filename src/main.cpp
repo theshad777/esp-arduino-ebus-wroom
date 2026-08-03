@@ -89,6 +89,8 @@ constexpr ledc_channel_t kPwmChannel = LEDC_CHANNEL_0;
 constexpr ledc_timer_t kPwmTimer = LEDC_TIMER_0;
 constexpr ledc_mode_t kPwmSpeedMode = LEDC_LOW_SPEED_MODE;
 
+#if defined(RESET_PIN)
+
 void configureGpioInputPullup(int pin) {
   gpio_config_t config{};
   config.pin_bit_mask = 1ULL << pin;
@@ -99,8 +101,11 @@ void configureGpioInputPullup(int pin) {
   gpio_config(&config);
 }
 
-void initPwm() {
+#endif
+
 #if defined(PWM_PIN)
+
+void initPwm() {
   ledc_timer_config_t timer{};
   timer.speed_mode = kPwmSpeedMode;
   timer.timer_num = kPwmTimer;
@@ -117,8 +122,10 @@ void initPwm() {
   channel.duty = 0;
   channel.hpoint = 0;
   ledc_channel_config(&channel);
-#endif
 }
+
+#endif
+
 
 void startCaptiveDns() {
   if (captiveDnsServer.start(kCaptiveDnsPort, "*", kCaptiveDnsIp)) {
@@ -169,15 +176,21 @@ inline void enableTX() {
 }
 
 void set_pwm() {
-  int value = configManager.readInt("pwmValue", 130);
+
 #if defined(PWM_PIN)
+
+  int value = configManager.readInt("pwmValue", 130);
+
   ledc_set_duty(kPwmSpeedMode, kPwmChannel, value);
   ledc_update_duty(kPwmSpeedMode, kPwmChannel);
+
 #if defined(EBUS_INTERNAL)
   schedule.resetCounter();
   schedule.resetTiming();
 #endif
+
 #endif
+
 }
 
 uint32_t get_pwm() {
