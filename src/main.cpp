@@ -41,7 +41,7 @@
 #include "HttpUtils.hpp"
 #include "UpgradeManager.hpp"
 #include "WifiNetworkManager.hpp"
-#include "esp32c3/rom/rtc.h"
+#include "esp_system.h"
 #include "esp_sntp.h"
 #include "http.hpp"
 
@@ -501,7 +501,7 @@ extern "C" void app_main(void) {
 
   check_reset();
 
-  reset_code = rtc_get_reset_reason(0);
+  reset_code = static_cast<uint32_t>(esp_reset_reason());
 
   calcUniqueId();
   loadAdapterHwVersionFromEfuse();
