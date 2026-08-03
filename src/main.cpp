@@ -199,15 +199,22 @@ void restart() {
 }
 
 void check_reset() {
+
+#if defined(RESET_PIN)
+
   // check if RESET_PIN being hold low and reset
   configureGpioInputPullup(RESET_PIN);
   uint32_t resetStart = (uint32_t)(esp_timer_get_time() / 1000ULL);
+
   while (gpio_get_level(static_cast<gpio_num_t>(RESET_PIN)) == 0) {
     if ((uint32_t)(esp_timer_get_time() / 1000ULL) > resetStart + RESET_MS) {
       configManager.resetConfig();
       restart();
     }
   }
+
+#endif
+
 }
 
 #if defined(EBUS_INTERNAL)
