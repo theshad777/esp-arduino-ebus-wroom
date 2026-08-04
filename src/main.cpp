@@ -362,8 +362,16 @@ const std::string getStatusJson() {
   cJSON_AddNumberToObject(status, "RX_Level", rx_current_level);
   cJSON_AddNumberToObject(status, "RX_Edges", rx_edge_count);
   cJSON_AddNumberToObject(
-    status, "Raw_UART_Bytes",
-    static_cast<int>(Bus._rawUartBytes));
+      status, "Raw_UART_Bytes",
+      static_cast<int>(Bus._rawUartBytes));
+
+  cJSON_AddNumberToObject(
+      status, "Raw_UART_Last",
+      static_cast<int>(Bus._rawUartLastByte));
+
+  cJSON_AddNumberToObject(
+      status, "Raw_UART_SYN_AA",
+      static_cast<int>(Bus._rawUartSynBytes));
 
 #if !defined(EBUS_INTERNAL)
   // Arbitration

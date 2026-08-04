@@ -70,6 +70,8 @@ class BusType {
   ATOMIC_INT _nbrErrors;
   ATOMIC_INT _nbrLate;
   ATOMIC_INT _rawUartBytes;
+  ATOMIC_INT _rawUartLastByte;
+  ATOMIC_INT _rawUartSynBytes;
 
  private:
   inline void push(const data& d);

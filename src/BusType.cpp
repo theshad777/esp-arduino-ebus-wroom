@@ -105,6 +105,8 @@ BusType::BusType()
       _nbrErrors(0),
       _nbrLate(0),
       _rawUartBytes(0),
+      _rawUartLastByte(0),
+      _rawUartSynBytes(0),
       _clientFd(-1) {}
 
 BusType::~BusType() { end(); }
@@ -245,6 +247,12 @@ bool BusType::read(data& d) {
   if (BusSer.available()) {
     uint8_t symbol = BusSer.read();
     _rawUartBytes++;
+    _rawUartLastByte = symbol;
+
+    if (symbol == 0xAA) {
+      _rawUartSynBytes++;
+    }
+
     receive(symbol, (uint32_t)(esp_timer_get_time()));
   }
 #endif
