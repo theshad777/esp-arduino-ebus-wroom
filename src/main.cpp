@@ -512,6 +512,9 @@ extern "C" void app_main(void) {
 
   logger.info("Starting esp-ebus adapter version " AUTO_VERSION);
 
+  logger.info("UART RX GPIO=" + std::to_string(UART_RX) +
+              ", TX GPIO=" + std::to_string(UART_TX));
+
   check_reset();
 
   reset_code = static_cast<uint32_t>(esp_reset_reason());
