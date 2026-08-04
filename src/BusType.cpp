@@ -104,6 +104,7 @@ BusType::BusType()
       _nbrWon2(0),
       _nbrErrors(0),
       _nbrLate(0),
+      _rawUartBytes(0),
       _clientFd(-1) {}
 
 BusType::~BusType() { end(); }
@@ -243,6 +244,7 @@ bool BusType::read(data& d) {
 #else
   if (BusSer.available()) {
     uint8_t symbol = BusSer.read();
+    _rawUartBytes++;
     receive(symbol, (uint32_t)(esp_timer_get_time()));
   }
 #endif
