@@ -4,6 +4,8 @@
 #include <cstdint>
 
 #include <driver/uart.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
 
 class UartPort {
  public:
@@ -22,6 +24,11 @@ class UartPort {
   void setRxBufferSize(size_t size);
   void setRxFIFOFull(int fullThreshold);
   void setDebugOutput(bool enable);
+  void pollEvents();
+  uint32_t framingErrors() const;
+  uint32_t parityErrors() const;
+  uint32_t fifoOverflows() const;
+  uint32_t bufferFullErrors() const;
 
  private:
   void ensureInstalled(int baud, int rxPin, int txPin);
@@ -30,6 +37,12 @@ class UartPort {
   bool installed_ = false;
   size_t rxBufferSize_ = 1024;
   int cachedByte_ = -1;
+  QueueHandle_t eventQueue_ = nullptr;
+
+  uint32_t framingErrors_ = 0;
+  uint32_t parityErrors_ = 0;
+  uint32_t fifoOverflows_ = 0;
+  uint32_t bufferFullErrors_ = 0;
 };
 
 extern UartPort BusSer;

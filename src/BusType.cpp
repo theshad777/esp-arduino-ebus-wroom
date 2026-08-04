@@ -246,6 +246,8 @@ bool BusType::read(data& d) {
     receive(symbol, mySerial.readStartBitTimeStamp());
   }
 #else
+  BusSer.pollEvents();
+
   if (BusSer.available()) {
     uint8_t symbol = BusSer.read();
     _rawUartBytes++;

@@ -39,7 +39,8 @@ void UartPort::ensureInstalled(int baud, int rxPin, int txPin) {
   (void)txPin;
   int rxBuffer = static_cast<int>(rxBufferSize_);
   int txBuffer = 0;
-  if (uart_driver_install(port_, rxBuffer, txBuffer, 0, nullptr, 0) != ESP_OK) {
+  if (uart_driver_install(port_, rxBuffer, txBuffer, 20, &eventQueue_, 0) !=
+      ESP_OK) {
     ESP_LOGE(kTag, "uart_driver_install failed for port %d", port_);
   } else {
     installed_ = true;
@@ -96,3 +97,48 @@ void UartPort::setRxFIFOFull(int fullThreshold) {
 }
 
 void UartPort::setDebugOutput(bool enable) { (void)enable; }
+
+void UartPort::pollEvents() {
+  if (eventQueue_ == nullptr) return;
+
+  uart_event_t event{};
+
+  while (xQueueReceive(eventQueue_, &event, 0) == pdTRUE) {
+    switch (event.type) {
+      case UART_FRAME_ERR:
+        framingErrors_++;
+        break;
+
+      case UART_PARITY_ERR:
+        parityErrors_++;
+        break;
+
+      case UART_FIFO_OVF:
+        fifoOverflows_++;
+        break;
+
+      case UART_BUFFER_FULL:
+        bufferFullErrors_++;
+        break;
+
+      default:
+        break;
+    }
+  }
+}
+
+uint32_t UartPort::framingErrors() const {
+  return framingErrors_;
+}
+
+uint32_t UartPort::parityErrors() const {
+  return parityErrors_;
+}
+
+uint32_t UartPort::fifoOverflows() const {
+  return fifoOverflows_;
+}
+
+uint32_t UartPort::bufferFullErrors() const {
+  return bufferFullErrors_;
+}

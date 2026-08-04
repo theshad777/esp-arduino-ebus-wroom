@@ -380,6 +380,21 @@ const std::string getStatusJson() {
   cJSON_AddNumberToObject(
       status, "Raw_UART_FF",
       static_cast<int>(Bus._rawUartFFBytes));
+  cJSON_AddNumberToObject(
+      status, "UART_Frame_Errors",
+      static_cast<int>(BusSer.framingErrors()));
+
+  cJSON_AddNumberToObject(
+      status, "UART_Parity_Errors",
+      static_cast<int>(BusSer.parityErrors()));
+
+  cJSON_AddNumberToObject(
+      status, "UART_FIFO_Overflows",
+      static_cast<int>(BusSer.fifoOverflows()));
+
+  cJSON_AddNumberToObject(
+      status, "UART_Buffer_Full",
+      static_cast<int>(BusSer.bufferFullErrors()));
 
 #if !defined(EBUS_INTERNAL)
   // Arbitration
