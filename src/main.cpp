@@ -373,6 +373,14 @@ const std::string getStatusJson() {
       status, "Raw_UART_SYN_AA",
       static_cast<int>(Bus._rawUartSynBytes));
 
+  cJSON_AddNumberToObject(
+      status, "Raw_UART_00",
+      static_cast<int>(Bus._rawUartZeroBytes));
+
+  cJSON_AddNumberToObject(
+      status, "Raw_UART_FF",
+      static_cast<int>(Bus._rawUartFFBytes));
+
 #if !defined(EBUS_INTERNAL)
   // Arbitration
   cJSON* arbitration = cJSON_AddObjectToObject(doc, "Arbitration");
