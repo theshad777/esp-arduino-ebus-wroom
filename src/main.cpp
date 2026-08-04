@@ -155,6 +155,25 @@ void prepareRuntimeForUpgrade() {
 
 // status
 uint32_t reset_code = 0;
+volatile uint32_t rx_edge_count = 0;
+volatile int rx_current_level = -1;
+
+void rxMonitorTask(void* parameter) {
+  int last = gpio_get_level(static_cast<gpio_num_t>(UART_RX));
+  rx_current_level = last;
+
+  while (true) {
+    int now = gpio_get_level(static_cast<gpio_num_t>(UART_RX));
+
+    if (now != last) {
+      ++rx_edge_count;
+      last = now;
+    }
+
+    rx_current_level = now;
+    vTaskDelay(pdMS_TO_TICKS(1));
+  }
+}
 
 inline void disableTX() {
 #if defined(TX_DISABLE_PIN)
@@ -338,6 +357,10 @@ const std::string getStatusJson() {
   cJSON_AddNumberToObject(status, "Reset_Code", reset_code);
   cJSON_AddNumberToObject(status, "Uptime", uptime);
   cJSON_AddNumberToObject(status, "Free_Heap", free_heap);
+  cJSON_AddNumberToObject(status, "UART_RX_GPIO", UART_RX);
+  cJSON_AddNumberToObject(status, "UART_TX_GPIO", UART_TX);
+  cJSON_AddNumberToObject(status, "RX_Level", rx_current_level);
+  cJSON_AddNumberToObject(status, "RX_Edges", rx_edge_count);
 
 #if !defined(EBUS_INTERNAL)
   // Arbitration
@@ -530,6 +553,10 @@ extern "C" void app_main(void) {
 
 #if !defined(EBUS_INTERNAL)
   Bus.begin();
+#endif
+
+#if !defined(EBUS_INTERNAL)
+  xTaskCreate(rxMonitorTask, "rxMonitor", 2048, nullptr, 1, nullptr);
 #endif
 
   disableTX();
