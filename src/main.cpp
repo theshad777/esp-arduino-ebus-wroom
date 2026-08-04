@@ -157,6 +157,35 @@ void prepareRuntimeForUpgrade() {
 uint32_t reset_code = 0;
 volatile uint32_t rx_edge_count = 0;
 volatile int rx_current_level = -1;
+volatile uint32_t rx_last_low_us = 0;
+volatile uint32_t rx_min_low_us = UINT32_MAX;
+volatile uint32_t rx_max_low_us = 0;
+volatile uint64_t rx_low_started_us = 0;
+
+static void IRAM_ATTR rxEdgeIsr(void* arg) {
+  const int level =
+      gpio_get_level(static_cast<gpio_num_t>(UART_RX));
+  const uint64_t now = esp_timer_get_time();
+
+  if (level == 0) {
+    rx_low_started_us = now;
+  } else if (rx_low_started_us != 0) {
+    const uint32_t duration =
+        static_cast<uint32_t>(now - rx_low_started_us);
+
+    rx_last_low_us = duration;
+
+    if (duration < rx_min_low_us) {
+      rx_min_low_us = duration;
+    }
+
+    if (duration > rx_max_low_us) {
+      rx_max_low_us = duration;
+    }
+
+    rx_low_started_us = 0;
+  }
+}
 
 void rxMonitorTask(void* parameter) {
   int last = gpio_get_level(static_cast<gpio_num_t>(UART_RX));
@@ -361,6 +390,13 @@ const std::string getStatusJson() {
   cJSON_AddNumberToObject(status, "UART_TX_GPIO", UART_TX);
   cJSON_AddNumberToObject(status, "RX_Level", rx_current_level);
   cJSON_AddNumberToObject(status, "RX_Edges", rx_edge_count);
+  cJSON_AddNumberToObject(status, "RX_Last_Low_us", rx_last_low_us);
+
+  cJSON_AddNumberToObject(
+      status, "RX_Min_Low_us",
+      rx_min_low_us == UINT32_MAX ? 0 : rx_min_low_us);
+
+  cJSON_AddNumberToObject(status, "RX_Max_Low_us", rx_max_low_us);
   cJSON_AddNumberToObject(
       status, "Raw_UART_Bytes",
       static_cast<int>(Bus._rawUartBytes));
@@ -590,9 +626,24 @@ extern "C" void app_main(void) {
 #endif
 
 #if !defined(EBUS_INTERNAL)
-  xTaskCreate(rxMonitorTask, "rxMonitor", 2048, nullptr, 1, nullptr);
+  gpio_set_intr_type(
+      static_cast<gpio_num_t>(UART_RX),
+      GPIO_INTR_ANYEDGE);
+
+  esp_err_t isrResult = gpio_install_isr_service(0);
+  if (isrResult != ESP_OK && isrResult != ESP_ERR_INVALID_STATE) {
+    logger.error("Failed to install GPIO ISR service");
+  }
+
+  gpio_isr_handler_add(
+      static_cast<gpio_num_t>(UART_RX),
+      rxEdgeIsr,
+      nullptr);
 #endif
 
+#if !defined(EBUS_INTERNAL)
+  xTaskCreate(rxMonitorTask, "rxMonitor", 2048, nullptr, 1, nullptr);
+#endif
   disableTX();
 
 #if defined(PWM_PIN)
