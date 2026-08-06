@@ -109,6 +109,9 @@ BusType::BusType()
       _rawUartSynBytes(0),
       _rawUartZeroBytes(0),
       _rawUartFFBytes(0),
+      _dbgAfterReceive(0),
+      _dbgQueueHasData(0),
+      _dbgReadTrue(0),
       _clientFd(-1) {}
 
 BusType::~BusType() { end(); }
@@ -265,13 +268,20 @@ bool BusType::read(data& d) {
     }
 
     receive(symbol, (uint32_t)(esp_timer_get_time()));
+
+    _dbgAfterReceive++;
   }
 #endif
-  if (_queue.size() > 0) {
+ if (_queue.size() > 0) {
+    _dbgQueueHasData++;
+
     d = _queue.front();
     _queue.pop();
+
+    _dbgReadTrue++;
     return true;
   }
+
   return false;
 #endif
 }

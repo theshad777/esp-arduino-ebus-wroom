@@ -431,6 +431,18 @@ const std::string getStatusJson() {
   cJSON_AddNumberToObject(
       status, "UART_Buffer_Full",
       static_cast<int>(BusSer.bufferFullErrors()));
+  cJSON_AddNumberToObject(status, "Bus_After_Receive",
+      static_cast<int>(Bus._dbgAfterReceive));
+  cJSON_AddNumberToObject(status, "Bus_Queue_Has_Data",
+      static_cast<int>(Bus._dbgQueueHasData));
+  cJSON_AddNumberToObject(status, "Bus_Read_True",
+      static_cast<int>(Bus._dbgReadTrue));
+  cJSON_AddNumberToObject(status, "TCP_RO_Accepted",
+      static_cast<int>(getDbgTcpRoAccepted()));
+  cJSON_AddNumberToObject(status, "TCP_RO_Push_Attempts",
+      static_cast<int>(getDbgTcpRoPushAttempts()));
+  cJSON_AddNumberToObject(status, "TCP_RO_Bytes_Sent",
+      static_cast<int>(getDbgTcpRoBytesSent()));
 
 #if !defined(EBUS_INTERNAL)
   // Arbitration

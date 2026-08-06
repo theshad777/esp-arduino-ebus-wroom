@@ -2,6 +2,10 @@
 
 #include <cstdint>
 
+uint32_t getDbgTcpRoAccepted();
+uint32_t getDbgTcpRoPushAttempts();
+uint32_t getDbgTcpRoBytesSent();
+
 bool handleNewClient(int serverFd, int clients[]);
 
 bool startClientRuntime();

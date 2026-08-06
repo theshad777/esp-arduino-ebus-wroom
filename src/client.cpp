@@ -3,6 +3,7 @@
 #include <cerrno>
 #include <cstring>
 #include <fcntl.h>
+#include <atomic>
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -30,6 +31,10 @@ int wifiClientsEnhanced[MAX_WIFI_CLIENTS] = {-1, -1, -1, -1};
 
 int wifiServerReadOnlyFd = -1;
 int wifiClientsReadOnly[MAX_WIFI_CLIENTS] = {-1, -1, -1, -1};
+
+std::atomic<uint32_t> dbgTcpRoAccepted{0};
+std::atomic<uint32_t> dbgTcpRoPushAttempts{0};
+std::atomic<uint32_t> dbgTcpRoBytesSent{0};
 
 constexpr uint16_t kPortDefault = 3333;
 constexpr uint16_t kPortEnhanced = 3335;
@@ -78,7 +83,9 @@ void clientAcceptTask(void* arg) {
   for (;;) {
     handleNewClient(wifiServerFd, wifiClients);
     handleNewClient(wifiServerEnhancedFd, wifiClientsEnhanced);
-    handleNewClient(wifiServerReadOnlyFd, wifiClientsReadOnly);
+    if (handleNewClient(wifiServerReadOnlyFd, wifiClientsReadOnly)) {
+      dbgTcpRoAccepted++;
+    }
     vTaskDelay(1);
   }
 }
@@ -90,6 +97,7 @@ void dataProcess() {
   }
 
   BusType::data data;
+
   if (Bus.read(data)) {
     for (int i = 0; i < MAX_WIFI_CLIENTS; i++) {
       if (data._enhanced) {
@@ -98,10 +106,19 @@ void dataProcess() {
         }
       } else {
         pushClient(&wifiClients[i], data._d);
-        pushClient(&wifiClientsReadOnly[i], data._d);
+
+        dbgTcpRoPushAttempts++;
+
+        if (pushClient(&wifiClientsReadOnly[i], data._d) > 0) {
+          dbgTcpRoBytesSent++;
+        }
+
         if (data._clientFd != wifiClientsEnhanced[i]) {
-          pushClientEnhanced(&wifiClientsEnhanced[i], data._c, data._d,
-                             data._logToClientFd == wifiClientsEnhanced[i]);
+          pushClientEnhanced(
+              &wifiClientsEnhanced[i],
+              data._c,
+              data._d,
+              data._logToClientFd == wifiClientsEnhanced[i]);
         }
       }
     }
@@ -372,4 +389,16 @@ int pushClientEnhanced(int* clientFd, uint8_t c, uint8_t d, bool log) {
     return 1;
   }
   return 0;
+}
+
+uint32_t getDbgTcpRoAccepted() {
+  return dbgTcpRoAccepted.load();
+}
+
+uint32_t getDbgTcpRoPushAttempts() {
+  return dbgTcpRoPushAttempts.load();
+}
+
+uint32_t getDbgTcpRoBytesSent() {
+  return dbgTcpRoBytesSent.load();
 }

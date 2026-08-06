@@ -74,7 +74,10 @@ class BusType {
   ATOMIC_INT _rawUartSynBytes;
   ATOMIC_INT _rawUartZeroBytes;
   ATOMIC_INT _rawUartFFBytes;
-
+  ATOMIC_INT _dbgAfterReceive;
+  ATOMIC_INT _dbgQueueHasData;
+  ATOMIC_INT _dbgReadTrue;
+  
  private:
   inline void push(const data& d);
   void receive(uint8_t symbol, uint32_t startBitTime);
