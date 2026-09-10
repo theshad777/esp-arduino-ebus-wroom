@@ -24,6 +24,10 @@ bool setArbitrationClient(int& clientFd, uint8_t& address);
 
 void arbitrationDone();
 int arbitrationRequested(uint8_t& address);
+uint32_t getDbgArbRequestSeen();
+uint32_t getDbgArbStartNotStarted();
+uint32_t getDbgArbStartLate();
+uint32_t getDbgArbStartStarted();
 
 #include "atomic"
 #define ATOMIC_INT std::atomic<int>
@@ -77,6 +81,7 @@ class BusType {
   ATOMIC_INT _dbgAfterReceive;
   ATOMIC_INT _dbgQueueHasData;
   ATOMIC_INT _dbgReadTrue;
+  
   
  private:
   inline void push(const data& d);

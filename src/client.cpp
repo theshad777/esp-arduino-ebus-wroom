@@ -35,6 +35,26 @@ int wifiClientsReadOnly[MAX_WIFI_CLIENTS] = {-1, -1, -1, -1};
 std::atomic<uint32_t> dbgTcpRoAccepted{0};
 std::atomic<uint32_t> dbgTcpRoPushAttempts{0};
 std::atomic<uint32_t> dbgTcpRoBytesSent{0};
+std::atomic<uint32_t> dbgTcpAcceptLoops{0};
+std::atomic<uint32_t> dbgSocketPeekData{0};
+std::atomic<uint32_t> dbgSocketPeekAgain{0};
+std::atomic<uint32_t> dbgSocketPeekClosed{0};
+std::atomic<uint32_t> dbgSocketPeekOtherErr{0};
+std::atomic<int32_t> dbgSocketPeekLastErrno{0};
+std::atomic<uint32_t> dbgSocketSendOk{0};
+std::atomic<uint32_t> dbgSocketSendErr{0};
+std::atomic<int32_t> dbgSocketSendLastErrno{0};
+std::atomic<uint32_t> dbgEnhancedSecondByteMissing{0};
+std::atomic<uint32_t> dbgEnhancedSignatureError{0};
+std::atomic<uint32_t> dbgEnhancedArbRequestSet{0};
+std::atomic<uint32_t> dbgEnhancedCmdInit{0};
+std::atomic<uint32_t> dbgEnhancedCmdSend{0};
+std::atomic<uint32_t> dbgEnhancedCmdStart{0};
+std::atomic<uint32_t> dbgEnhancedCmdStartSyn{0};
+std::atomic<uint32_t> dbgEnhancedCmdStartAddress{0};
+std::atomic<uint32_t> dbgEnhancedCmdInfo{0};
+std::atomic<uint32_t> dbgEnhancedFirstSignatureError{0};
+std::atomic<uint32_t> dbgEnhancedLastStartAddress{0};
 
 constexpr uint16_t kPortDefault = 3333;
 constexpr uint16_t kPortEnhanced = 3335;
@@ -81,6 +101,7 @@ bool createListenSockets() {
 
 void clientAcceptTask(void* arg) {
   for (;;) {
+    dbgTcpAcceptLoops++;
     handleNewClient(wifiServerFd, wifiClients);
     handleNewClient(wifiServerEnhancedFd, wifiClientsEnhanced);
     if (handleNewClient(wifiServerReadOnlyFd, wifiClientsReadOnly)) {
@@ -128,16 +149,37 @@ void dataProcess() {
 void dataLoop(void* arg) {
   for (;;) {
     dataProcess();
+    
   }
 }
 
 bool isSocketConnected(int clientFd) {
   if (clientFd < 0) return false;
+
   char buffer = 0;
-  const int result = recv(clientFd, &buffer, 1, MSG_PEEK | MSG_DONTWAIT);
-  if (result > 0) return true;
-  if (result == 0) return false;
-  return errno == EWOULDBLOCK || errno == EAGAIN;
+  errno = 0;
+
+  const int result =
+      recv(clientFd, &buffer, 1, MSG_PEEK | MSG_DONTWAIT);
+
+  if (result > 0) {
+    dbgSocketPeekData++;
+    return true;
+  }
+
+  if (result == 0) {
+    dbgSocketPeekClosed++;
+    return false;
+  }
+
+  if (errno == EWOULDBLOCK || errno == EAGAIN) {
+    dbgSocketPeekAgain++;
+    return true;
+  }
+
+  dbgSocketPeekOtherErr++;
+  dbgSocketPeekLastErrno = errno;
+  return false;
 }
 
 void closeSocket(int& clientFd) {
@@ -167,9 +209,18 @@ int socketReadByte(int clientFd, int flags = MSG_DONTWAIT) {
 
 size_t socketWriteBytes(int clientFd, const uint8_t* data, size_t size) {
   if (clientFd < 0 || data == nullptr || size == 0) return 0;
+
+  errno = 0;
   const int result = send(clientFd, data, size, 0);
-  if (result < 0) return 0;
-  return static_cast<size_t>(result);
+
+  if (result > 0) {
+    dbgSocketSendOk++;
+    return static_cast<size_t>(result);
+  }
+
+  dbgSocketSendErr++;
+  dbgSocketSendLastErrno = errno;
+  return 0;
 }
 
 size_t socketWriteString(int clientFd, const char* message) {
@@ -261,10 +312,17 @@ void handleClient(int* clientFd) {
 }
 
 int pushClient(int* clientFd, uint8_t byte) {
-  if (isSocketConnected(*clientFd)) {
-    socketWriteBytes(*clientFd, &byte, 1);
+  if (*clientFd < 0) {
+    return 0;
+  }
+
+  const size_t written = socketWriteBytes(*clientFd, &byte, 1);
+
+  if (written == 1) {
     return 1;
   }
+
+  closeSocket(*clientFd);
   return 0;
 }
 
@@ -278,48 +336,62 @@ void encode(uint8_t c, uint8_t d, uint8_t (&data)[2]) {
   data[1] = M2 | (d & 0b00111111);
 }
 
-void send_res(int* clientFd, uint8_t c, uint8_t d) {
+size_t send_res(int* clientFd, uint8_t c, uint8_t d) {
   uint8_t data[2];
   encode(c, d, data);
-  socketWriteBytes(*clientFd, data, 2);
+  return socketWriteBytes(*clientFd, data, 2);
 }
 
 void process_cmd(int* clientFd, uint8_t c, uint8_t d) {
   if (c == CMD_INIT) {
+    dbgEnhancedCmdInit++;
     send_res(clientFd, RESETTED, 0x0);
     return;
   }
+
   if (c == CMD_START) {
+    dbgEnhancedCmdStart++;
+
     if (d == SYN) {
+      dbgEnhancedCmdStartSyn++;
       clearArbitrationClient();
       DEBUG_LOG("CMD_START SYN\n");
       return;
     } else {
+      dbgEnhancedCmdStartAddress++;
+      dbgEnhancedLastStartAddress = d;
+
       // start arbitration
       int cl = *clientFd;
       uint8_t ad = d;
       int arbitrationClientFd = *clientFd;
+
       if (!setArbitrationClient(arbitrationClientFd, d)) {
         if (cl != arbitrationClientFd) {
-          // only one client can be in arbitration
-          DEBUG_LOG("CMD_START ONGOING 0x%02 0x%02x\n", ad, d);
+          DEBUG_LOG("CMD_START ONGOING 0x%02x 0x%02x\n", ad, d);
           send_res(clientFd, ERROR_HOST, ERR_FRAMING);
           return;
         } else {
           DEBUG_LOG("CMD_START REPEAT 0x%02x\n", d);
         }
       } else {
+        dbgEnhancedArbRequestSet++;
         DEBUG_LOG("CMD_START 0x%02x\n", d);
       }
+
       return;
     }
   }
+
   if (c == CMD_SEND) {
+    dbgEnhancedCmdSend++;
     DEBUG_LOG("SEND 0x%02x\n", d);
     Bus.write(d);
     return;
   }
+
   if (c == CMD_INFO) {
+    dbgEnhancedCmdInfo++;
     // if needed, set bit 0 as reply to INIT command
     return;
   }
@@ -342,6 +414,7 @@ bool read_cmd(int* clientFd, uint8_t (&data)[2]) {
   }
 
   if (b < 0b11000000) {
+    dbgEnhancedFirstSignatureError++;
     DEBUG_LOG("first command signature error\n");
     socketWriteString(*clientFd, "first command signature error");
     // first command signature error
@@ -352,7 +425,7 @@ bool read_cmd(int* clientFd, uint8_t (&data)[2]) {
   b2 = socketReadByte(*clientFd);
 
   if (b2 < 0) {
-    // second command missing
+    dbgEnhancedSecondByteMissing++;
     DEBUG_LOG("second command missing\n");
     socketWriteString(*clientFd, "second command missing");
     closeSocket(*clientFd);
@@ -360,7 +433,7 @@ bool read_cmd(int* clientFd, uint8_t (&data)[2]) {
   }
 
   if ((b2 & 0b11000000) != 0b10000000) {
-    // second command signature error
+    dbgEnhancedSignatureError++;
     DEBUG_LOG("second command signature error\n");
     socketWriteString(*clientFd, "second command signature error");
     closeSocket(*clientFd);
@@ -372,8 +445,57 @@ bool read_cmd(int* clientFd, uint8_t (&data)[2]) {
 }
 
 void handleClientEnhanced(int* clientFd) {
-  while (socketAvailable(*clientFd)) {
+  if (*clientFd < 0) {
+    return;
+  }
+
+  for (;;) {
+    uint8_t peek[2]{};
+
+    errno = 0;
+    const int available =
+        recv(*clientFd, peek, sizeof(peek), MSG_PEEK | MSG_DONTWAIT);
+
+    if (available == 0) {
+      closeSocket(*clientFd);
+      return;
+    }
+
+    if (available < 0) {
+      if (errno == EWOULDBLOCK || errno == EAGAIN) {
+        return;
+      }
+
+      closeSocket(*clientFd);
+      return;
+    }
+
+    // Plain CMD_SEND consists of one byte (< 0x80).
+    if (peek[0] < 0x80) {
+      uint8_t data[2];
+
+      if (read_cmd(clientFd, data)) {
+        process_cmd(clientFd, data[0], data[1]);
+      }
+
+      continue;
+    }
+
+    // 0x80..0xBF can never be a valid first enhanced command byte.
+    if (peek[0] < 0xC0) {
+      uint8_t data[2];
+      read_cmd(clientFd, data);
+      continue;
+    }
+
+    // Enhanced command is two bytes.
+    // Do NOT consume the first byte until both bytes have arrived.
+    if (available < 2) {
+      return;
+    }
+
     uint8_t data[2];
+
     if (read_cmd(clientFd, data)) {
       process_cmd(clientFd, data[0], data[1]);
     }
@@ -384,10 +506,18 @@ int pushClientEnhanced(int* clientFd, uint8_t c, uint8_t d, bool log) {
   if (log) {
     DEBUG_LOG("DATA           0x%02x 0x%02x\n", c, d);
   }
-  if (isSocketConnected(*clientFd)) {
-    send_res(clientFd, c, d);
+
+  if (!isSocketConnected(*clientFd)) {
+    return 0;
+  }
+
+  const size_t written = send_res(clientFd, c, d);
+
+  if (written == 2) {
     return 1;
   }
+
+  closeSocket(*clientFd);
   return 0;
 }
 
@@ -401,4 +531,82 @@ uint32_t getDbgTcpRoPushAttempts() {
 
 uint32_t getDbgTcpRoBytesSent() {
   return dbgTcpRoBytesSent.load();
+}
+
+uint32_t getDbgTcpAcceptLoops() {
+  return dbgTcpAcceptLoops.load();
+}
+uint32_t getDbgSocketPeekData() {
+  return dbgSocketPeekData.load();
+}
+
+uint32_t getDbgSocketPeekAgain() {
+  return dbgSocketPeekAgain.load();
+}
+
+uint32_t getDbgSocketPeekClosed() {
+  return dbgSocketPeekClosed.load();
+}
+
+uint32_t getDbgSocketPeekOtherErr() {
+  return dbgSocketPeekOtherErr.load();
+}
+
+int32_t getDbgSocketPeekLastErrno() {
+  return dbgSocketPeekLastErrno.load();
+}
+uint32_t getDbgSocketSendOk() {
+  return dbgSocketSendOk.load();
+}
+
+uint32_t getDbgSocketSendErr() {
+  return dbgSocketSendErr.load();
+}
+
+int32_t getDbgSocketSendLastErrno() {
+  return dbgSocketSendLastErrno.load();
+}
+
+uint32_t getDbgEnhancedSecondByteMissing() {
+  return dbgEnhancedSecondByteMissing.load();
+}
+
+uint32_t getDbgEnhancedSignatureError() {
+  return dbgEnhancedSignatureError.load();
+}
+
+uint32_t getDbgEnhancedArbRequestSet() {
+  return dbgEnhancedArbRequestSet.load();
+}
+
+uint32_t getDbgEnhancedCmdInit() {
+  return dbgEnhancedCmdInit.load();
+}
+
+uint32_t getDbgEnhancedCmdSend() {
+  return dbgEnhancedCmdSend.load();
+}
+
+uint32_t getDbgEnhancedCmdStart() {
+  return dbgEnhancedCmdStart.load();
+}
+
+uint32_t getDbgEnhancedCmdStartSyn() {
+  return dbgEnhancedCmdStartSyn.load();
+}
+
+uint32_t getDbgEnhancedCmdStartAddress() {
+  return dbgEnhancedCmdStartAddress.load();
+}
+
+uint32_t getDbgEnhancedCmdInfo() {
+  return dbgEnhancedCmdInfo.load();
+}
+
+uint32_t getDbgEnhancedFirstSignatureError() {
+  return dbgEnhancedFirstSignatureError.load();
+}
+
+uint32_t getDbgEnhancedLastStartAddress() {
+  return dbgEnhancedLastStartAddress.load();
 }

@@ -57,6 +57,11 @@ SemaphoreHandle_t getMutex() {
 int _arbitration_client = -1;
 int _arbitration_address = -1;
 
+std::atomic<uint32_t> dbgArbRequestSeen{0};
+std::atomic<uint32_t> dbgArbStartNotStarted{0};
+std::atomic<uint32_t> dbgArbStartLate{0};
+std::atomic<uint32_t> dbgArbStartStarted{0};
+
 void getArbitrationClient(int& clientFd, uint8_t& address) {
   ENH_MUTEX_LOCK();
   clientFd = _arbitration_client;
@@ -304,80 +309,146 @@ void BusType::push(const data& d) {
 
 void BusType::receive(uint8_t symbol, uint32_t startBitTime) {
   _busState.data(symbol);
-  Arbitration::state state = _arbitration.data(_busState, symbol, startBitTime);
+
+  Arbitration::state state =
+      _arbitration.data(_busState, symbol, startBitTime);
+
   switch (state) {
     case Arbitration::restart1:
       _nbrRestarts1++;
       goto NONE;
+
     case Arbitration::restart2:
       _nbrRestarts2++;
       goto NONE;
+
     case Arbitration::none:
     NONE:
       uint8_t address;
       _clientFd = arbitrationRequested(address);
+
       if (_clientFd >= 0) {
-        switch (_arbitration.start(_busState, address, startBitTime)) {
+        dbgArbRequestSeen++;
+
+        Arbitration::result startResult =
+            _arbitration.start(_busState, address, startBitTime);
+
+        switch (startResult) {
           case Arbitration::started:
+            dbgArbStartStarted++;
             _nbrArbitrations++;
-            DEBUG_LOG("BUS START SUCC 0x%02x %lu us\n", symbol,
+
+            DEBUG_LOG("BUS START SUCC 0x%02x %lu us\n",
+                      symbol,
                       _busState.microsSinceLastSyn());
             break;
+
           case Arbitration::late:
+            dbgArbStartLate++;
             _nbrLate++;
-            [[fallthrough]];
-          case Arbitration::not_started:
-            DEBUG_LOG("BUS START WAIT 0x%02x %lu us\n", symbol,
+
+            DEBUG_LOG("BUS START LATE 0x%02x %lu us\n",
+                      symbol,
                       _busState.microsSinceLastSyn());
+            break;
+
+          case Arbitration::not_started:
+            dbgArbStartNotStarted++;
+
+            DEBUG_LOG("BUS START WAIT 0x%02x %lu us\n",
+                      symbol,
+                      _busState.microsSinceLastSyn());
+            break;
         }
       }
+
       // send to everybody. ebusd needs the SYN to get in the right mood
       push({false, RECEIVED, symbol, -1, _clientFd});
       break;
+
     case Arbitration::arbitrating:
-      DEBUG_LOG("BUS ARBITRATIN 0x%02x %lu us\n", symbol,
+      DEBUG_LOG("BUS ARBITRATIN 0x%02x %lu us\n",
+                symbol,
                 _busState.microsSinceLastSyn());
+
       // do not send to arbitration client
       push({false, RECEIVED, symbol, _clientFd, _clientFd});
       break;
+
     case Arbitration::won1:
       _nbrWon1++;
       goto WON;
+
     case Arbitration::won2:
       _nbrWon2++;
+
     WON:
       arbitrationDone();
-      DEBUG_LOG("BUS SEND WON   0x%02x %lu us\n", _busState._master,
+
+      DEBUG_LOG("BUS SEND WON   0x%02x %lu us\n",
+                _busState._master,
                 _busState.microsSinceLastSyn());
+
       // send only to the arbitrating client
       push({true, STARTED, _busState._master, _clientFd, _clientFd});
+
       // do not send to arbitrating client
       push({false, RECEIVED, symbol, _clientFd, _clientFd});
+
       _clientFd = -1;
       break;
+
     case Arbitration::lost1:
       _nbrLost1++;
       goto LOST;
+
     case Arbitration::lost2:
       _nbrLost2++;
+
     LOST:
       arbitrationDone();
-      DEBUG_LOG("BUS SEND LOST  0x%02x 0x%02x %lu us\n", _busState._master,
-                _busState._symbol, _busState.microsSinceLastSyn());
+
+      DEBUG_LOG("BUS SEND LOST  0x%02x 0x%02x %lu us\n",
+                _busState._master,
+                _busState._symbol,
+                _busState.microsSinceLastSyn());
+
       // send only to the arbitrating client
       push({true, FAILED, _busState._master, _clientFd, _clientFd});
+
       // send to everybody
       push({false, RECEIVED, symbol, -1, _clientFd});
+
       _clientFd = -1;
       break;
+
     case Arbitration::error:
       _nbrErrors++;
       arbitrationDone();
+
       // send only to the arbitrating client
       push({true, ERROR_EBUS, ERR_FRAMING, _clientFd, _clientFd});
+
       // send to everybody
       push({false, RECEIVED, symbol, -1, _clientFd});
+
       _clientFd = -1;
       break;
   }
+}
+
+uint32_t getDbgArbRequestSeen() {
+  return dbgArbRequestSeen.load();
+}
+
+uint32_t getDbgArbStartNotStarted() {
+  return dbgArbStartNotStarted.load();
+}
+
+uint32_t getDbgArbStartLate() {
+  return dbgArbStartLate.load();
+}
+
+uint32_t getDbgArbStartStarted() {
+  return dbgArbStartStarted.load();
 }

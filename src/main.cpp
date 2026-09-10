@@ -388,61 +388,146 @@ const std::string getStatusJson() {
   cJSON_AddNumberToObject(status, "Free_Heap", free_heap);
   cJSON_AddNumberToObject(status, "UART_RX_GPIO", UART_RX);
   cJSON_AddNumberToObject(status, "UART_TX_GPIO", UART_TX);
-  cJSON_AddNumberToObject(status, "RX_Level", rx_current_level);
-  cJSON_AddNumberToObject(status, "RX_Edges", rx_edge_count);
-  cJSON_AddNumberToObject(status, "RX_Last_Low_us", rx_last_low_us);
+  // Diagnostics
+  cJSON* diagnostics = cJSON_AddObjectToObject(doc, "Diagnostics");
+  cJSON_AddNumberToObject(diagnostics, "RX_Level", rx_current_level);
+  cJSON_AddNumberToObject(diagnostics, "RX_Edges", rx_edge_count);
+  cJSON_AddNumberToObject(diagnostics, "RX_Last_Low_us", rx_last_low_us);
 
   cJSON_AddNumberToObject(
-      status, "RX_Min_Low_us",
+      diagnostics, "RX_Min_Low_us",
       rx_min_low_us == UINT32_MAX ? 0 : rx_min_low_us);
 
-  cJSON_AddNumberToObject(status, "RX_Max_Low_us", rx_max_low_us);
+  cJSON_AddNumberToObject(diagnostics, "RX_Max_Low_us", rx_max_low_us);
   cJSON_AddNumberToObject(
-      status, "Raw_UART_Bytes",
+      diagnostics, "Raw_UART_Bytes",
       static_cast<int>(Bus._rawUartBytes));
 
   cJSON_AddNumberToObject(
-      status, "Raw_UART_Last",
+      diagnostics, "Raw_UART_Last",
       static_cast<int>(Bus._rawUartLastByte));
 
   cJSON_AddNumberToObject(
-      status, "Raw_UART_SYN_AA",
+      diagnostics, "Raw_UART_SYN_AA",
       static_cast<int>(Bus._rawUartSynBytes));
 
   cJSON_AddNumberToObject(
-      status, "Raw_UART_00",
+      diagnostics, "Raw_UART_00",
       static_cast<int>(Bus._rawUartZeroBytes));
 
   cJSON_AddNumberToObject(
-      status, "Raw_UART_FF",
+      diagnostics, "Raw_UART_FF",
       static_cast<int>(Bus._rawUartFFBytes));
   cJSON_AddNumberToObject(
-      status, "UART_Frame_Errors",
+      diagnostics, "UART_Frame_Errors",
       static_cast<int>(BusSer.framingErrors()));
 
   cJSON_AddNumberToObject(
-      status, "UART_Parity_Errors",
+      diagnostics, "UART_Parity_Errors",
       static_cast<int>(BusSer.parityErrors()));
 
   cJSON_AddNumberToObject(
-      status, "UART_FIFO_Overflows",
+      diagnostics, "UART_FIFO_Overflows",
       static_cast<int>(BusSer.fifoOverflows()));
 
   cJSON_AddNumberToObject(
-      status, "UART_Buffer_Full",
+      diagnostics, "UART_Buffer_Full",
       static_cast<int>(BusSer.bufferFullErrors()));
-  cJSON_AddNumberToObject(status, "Bus_After_Receive",
+  cJSON_AddNumberToObject(diagnostics, "Bus_After_Receive",
       static_cast<int>(Bus._dbgAfterReceive));
-  cJSON_AddNumberToObject(status, "Bus_Queue_Has_Data",
+  cJSON_AddNumberToObject(diagnostics, "Bus_Queue_Has_Data",
       static_cast<int>(Bus._dbgQueueHasData));
-  cJSON_AddNumberToObject(status, "Bus_Read_True",
+  cJSON_AddNumberToObject(diagnostics, "Bus_Read_True",
       static_cast<int>(Bus._dbgReadTrue));
-  cJSON_AddNumberToObject(status, "TCP_RO_Accepted",
+  cJSON_AddNumberToObject(diagnostics, "TCP_RO_Accepted",
       static_cast<int>(getDbgTcpRoAccepted()));
-  cJSON_AddNumberToObject(status, "TCP_RO_Push_Attempts",
+  cJSON_AddNumberToObject(diagnostics, "TCP_RO_Push_Attempts",
       static_cast<int>(getDbgTcpRoPushAttempts()));
-  cJSON_AddNumberToObject(status, "TCP_RO_Bytes_Sent",
+  cJSON_AddNumberToObject(diagnostics, "TCP_RO_Bytes_Sent",
       static_cast<int>(getDbgTcpRoBytesSent()));
+  cJSON_AddNumberToObject(diagnostics, "TCP_Accept_Loops",
+      static_cast<int>(getDbgTcpAcceptLoops()));
+  cJSON_AddNumberToObject(diagnostics, "TCP_Peek_Data",
+      static_cast<int>(getDbgSocketPeekData()));
+  cJSON_AddNumberToObject(diagnostics, "TCP_Peek_Again",
+      static_cast<int>(getDbgSocketPeekAgain()));
+  cJSON_AddNumberToObject(diagnostics, "TCP_Peek_Closed",
+      static_cast<int>(getDbgSocketPeekClosed()));
+  cJSON_AddNumberToObject(diagnostics, "TCP_Peek_Other_Err",
+      static_cast<int>(getDbgSocketPeekOtherErr()));
+  cJSON_AddNumberToObject(diagnostics, "TCP_Peek_Last_Errno",
+      static_cast<int>(getDbgSocketPeekLastErrno()));
+  cJSON_AddNumberToObject(diagnostics, "TCP_Send_OK",
+      static_cast<int>(getDbgSocketSendOk()));
+  cJSON_AddNumberToObject(diagnostics, "TCP_Send_Err",
+      static_cast<int>(getDbgSocketSendErr()));
+  cJSON_AddNumberToObject(diagnostics, "TCP_Send_Last_Errno",
+      static_cast<int>(getDbgSocketSendLastErrno()));
+  cJSON_AddNumberToObject(
+    diagnostics,
+    "TCP_Enhanced_Second_Byte_Missing",
+    getDbgEnhancedSecondByteMissing());
+
+  cJSON_AddNumberToObject(
+    diagnostics,
+    "TCP_Enhanced_Signature_Error",
+    getDbgEnhancedSignatureError());
+    cJSON_AddNumberToObject(
+    diagnostics,
+    "TCP_Enhanced_Arb_Request_Set",
+    getDbgEnhancedArbRequestSet());
+
+  cJSON_AddNumberToObject(
+    diagnostics,
+    "Arb_Request_Seen",
+    getDbgArbRequestSeen());
+
+  cJSON_AddNumberToObject(
+    diagnostics,
+    "Arb_Start_Not_Started",
+    getDbgArbStartNotStarted());
+
+  cJSON_AddNumberToObject(
+    diagnostics,
+    "Arb_Start_Late",
+    getDbgArbStartLate());
+
+  cJSON_AddNumberToObject(
+    diagnostics,
+    "Arb_Start_Started",
+    getDbgArbStartStarted());
+
+  cJSON_AddNumberToObject(
+      diagnostics, "TCP_Enhanced_CMD_INIT",
+      getDbgEnhancedCmdInit());
+
+  cJSON_AddNumberToObject(
+      diagnostics, "TCP_Enhanced_CMD_SEND",
+      getDbgEnhancedCmdSend());
+
+  cJSON_AddNumberToObject(
+      diagnostics, "TCP_Enhanced_CMD_START",
+      getDbgEnhancedCmdStart());
+
+  cJSON_AddNumberToObject(
+      diagnostics, "TCP_Enhanced_CMD_START_SYN",
+      getDbgEnhancedCmdStartSyn());
+
+  cJSON_AddNumberToObject(
+      diagnostics, "TCP_Enhanced_CMD_START_Address",
+      getDbgEnhancedCmdStartAddress());
+
+  cJSON_AddNumberToObject(
+      diagnostics, "TCP_Enhanced_CMD_INFO",
+      getDbgEnhancedCmdInfo());
+
+  cJSON_AddNumberToObject(
+      diagnostics, "TCP_Enhanced_First_Signature_Error",
+      getDbgEnhancedFirstSignatureError());
+
+  cJSON_AddNumberToObject(
+      diagnostics, "TCP_Enhanced_Last_Start_Address",
+      getDbgEnhancedLastStartAddress());
 
 #if !defined(EBUS_INTERNAL)
   // Arbitration
