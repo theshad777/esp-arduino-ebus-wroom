@@ -23,8 +23,14 @@
             fetchJson('/api/v1/status', data => renderNestedSections(data, 'statusContainer'))
         );
 
-        // Initial load
-        fetchJson('/api/v1/status', data => renderNestedSections(data, 'statusContainer'));
+        // Initial load, then refresh every 10 s while the tab is visible.
+        function refreshStatus() {
+            if (!document.hidden) {
+                fetchJson('/api/v1/status', data => renderNestedSections(data, 'statusContainer'));
+            }
+        }
+        refreshStatus();
+        setInterval(refreshStatus, 10000);
     </script>
 </body>
 

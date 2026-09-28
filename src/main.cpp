@@ -1,4 +1,5 @@
 #include "main.hpp"
+#include "OutdoorTemp.hpp"
 
 #include <cJSON.h>
 #include <driver/gpio.h>
@@ -388,6 +389,19 @@ const std::string getStatusJson() {
   cJSON_AddNumberToObject(status, "Free_Heap", free_heap);
   cJSON_AddNumberToObject(status, "UART_RX_GPIO", UART_RX);
   cJSON_AddNumberToObject(status, "UART_TX_GPIO", UART_TX);
+  // Outdoor temperature: the Status page uses the existing JSON API.
+#if defined(OUTDOOR_DS_GPIO)
+  const auto outdoor = getOutdoorTemperatureSnapshot();
+  cJSON* outdoorJson = cJSON_AddObjectToObject(doc, "Outdoor_Temperature");
+  cJSON_AddStringToObject(outdoorJson, "State", outdoor.state);
+  cJSON_AddNumberToObject(outdoorJson, "DATA_GPIO", OUTDOOR_DS_GPIO);
+  if (outdoor.valid) {
+    cJSON_AddNumberToObject(outdoorJson, "Temperature_C", outdoor.temperatureC);
+  } else {
+    cJSON_AddNullToObject(outdoorJson, "Temperature_C");
+  }
+  cJSON_AddNumberToObject(outdoorJson, "Last_Valid_Age_s", outdoor.ageSeconds);
+#endif
   // Diagnostics
   cJSON* diagnostics = cJSON_AddObjectToObject(doc, "Diagnostics");
   cJSON_AddNumberToObject(diagnostics, "RX_Level", rx_current_level);
@@ -805,6 +819,9 @@ extern "C" void app_main(void) {
 
   espOtaManager.begin();
   enableTX();
+ 
+  // Start outdoor DS18B20 reader.
+  startOutdoorTemperatureReader();
 
 #if defined(EBUS_INTERNAL)
   ebus::busConfig busConfig = {.uart_port = UART_NUM_1,

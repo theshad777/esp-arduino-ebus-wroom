@@ -1,4 +1,21 @@
 dependencies:
+  espressif/ds18b20:
+    component_hash: 38022d0c39c08b1df3e77f95a3f9544251549a1fd9b6263357bf714026f4bb6b
+    dependencies:
+    - name: espressif/onewire_bus
+      registry_url: https://components.espressif.com
+      require: private
+      version: ^1.1.0
+    - matches:
+      - if: $CONFIG{DS18B20_SENSOR_HUB} == True
+      name: espressif/sensor_hub
+      registry_url: https://components.espressif.com
+      require: public
+      version: ^0.1.4
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 0.4.0
   espressif/mdns:
     component_hash: 7c0fa01a1cd0e72a87ec1928c3b661c0a3a9034a6d3a69dcf4850db8c6f272db
     dependencies:
@@ -9,6 +26,16 @@ dependencies:
       registry_url: https://components.espressif.com/
       type: service
     version: 1.10.1
+  espressif/onewire_bus:
+    component_hash: dcce4fb1c2fc43c3d02de1cc9abdf062127468a785578723696de3817c526f99
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.1.2
   idf:
     source:
       type: idf
@@ -24,8 +51,10 @@ dependencies:
       type: service
     version: 1.20.4
 direct_dependencies:
+- espressif/ds18b20
 - espressif/mdns
+- espressif/onewire_bus
 - joltwallet/littlefs
-manifest_hash: e4267b0015398f70cca64b515e8886d077a24e5559d087d4f8ed6180c5894dac
-target: esp32c3
+manifest_hash: 81881172189f5c0a48af2417271502899feec16b86f57338d0c09392f0a7ef52
+target: esp32
 version: 2.0.0
