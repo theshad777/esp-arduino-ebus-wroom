@@ -1,5 +1,6 @@
 #include "main.hpp"
 #include "OutdoorTemp.hpp"
+#include "OutdoorRelay.hpp"
 
 #include <cJSON.h>
 #include <driver/gpio.h>
@@ -401,6 +402,8 @@ const std::string getStatusJson() {
     cJSON_AddNullToObject(outdoorJson, "Temperature_C");
   }
   cJSON_AddNumberToObject(outdoorJson, "Last_Valid_Age_s", outdoor.ageSeconds);
+  cJSON_AddBoolToObject(outdoorJson, "Relay_Enabled", isOutdoorRelayEnabled());
+  cJSON_AddNumberToObject(outdoorJson, "Relay_GPIO", OUTDOOR_RELAY_GPIO);
 #endif
   // Diagnostics
   cJSON* diagnostics = cJSON_AddObjectToObject(doc, "Diagnostics");
@@ -819,7 +822,10 @@ extern "C" void app_main(void) {
 
   espOtaManager.begin();
   enableTX();
- 
+
+  // Safe relay initialization: LOW keeps the relay de-energized.
+  initOutdoorRelay();
+
   // Start outdoor DS18B20 reader.
   startOutdoorTemperatureReader();
 
