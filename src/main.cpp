@@ -1,6 +1,7 @@
 #include "main.hpp"
 #include "OutdoorTemp.hpp"
 #include "OutdoorRelay.hpp"
+#include "OutdoorMqtt.hpp"
 
 #include <cJSON.h>
 #include <driver/gpio.h>
@@ -404,6 +405,8 @@ const std::string getStatusJson() {
   cJSON_AddNumberToObject(outdoorJson, "Last_Valid_Age_s", outdoor.ageSeconds);
   cJSON_AddBoolToObject(outdoorJson, "Relay_Enabled", isOutdoorRelayEnabled());
   cJSON_AddNumberToObject(outdoorJson, "Relay_GPIO", OUTDOOR_RELAY_GPIO);
+  cJSON_AddStringToObject(outdoorJson, "MQTT_State", getOutdoorMqttState());
+  cJSON_AddStringToObject(outdoorJson, "MQTT_Topic", getOutdoorMqttTemperatureTopic());
 #endif
   // Diagnostics
   cJSON* diagnostics = cJSON_AddObjectToObject(doc, "Diagnostics");
@@ -828,6 +831,10 @@ extern "C" void app_main(void) {
 
   // Start outdoor DS18B20 reader.
   startOutdoorTemperatureReader();
+
+  // Telemetry only: publish outdoor temperature to MQTT.
+  // No subscriptions and no relay control are implemented here.
+  startOutdoorMqtt(unique_id);
 
 #if defined(EBUS_INTERNAL)
   ebus::busConfig busConfig = {.uart_port = UART_NUM_1,
